@@ -1,6 +1,6 @@
 streamlit
 openai
-opencv-python
+opencv-python-headless
 numpy
 imageio-ffmpeg
 pydub
