@@ -83,27 +83,26 @@ def transcribe_audio(audio_bytes):
     openai_client = get_openai_client()
     audio_file = BytesIO(audio_bytes)
     audio_file.name = "audio.mp3"
+
     transcript = openai_client.audio.transcriptions.create(
         file=audio_file,
         model=AUDIO_TRANSCRIBE_MODEL,
         response_format="verbose_json",
     )
 
-    # Oblicz koszt transkrypcji (Whisper-1: 0.006 USD za minutę)
-    duration = get_video_duration(st.session_state.audio)  # Pobiera długość w sekundach
-    add_cost("whisper", duration / 60)  # Whisper liczy koszt na minutę
-
     if hasattr(transcript, "segments") and isinstance(transcript.segments, list):
         transcription_with_timestamps = []
         for segment in transcript.segments:
             transcription_with_timestamps.append({
-                "word": re.sub(r"[^\w\s]", "", segment["text"]),
-                "start": segment.get("start", 0),
-                "end": segment.get("end", 0)
+                "word": re.sub(r"[^\w\s]", "", segment.text),  # ZAMIENIAMY segment["text"] na segment.text
+                "start": getattr(segment, "start", 0),  # Poprawna metoda dostępu do atrybutu
+                "end": getattr(segment, "end", 0)
             })
         return transcription_with_timestamps
     else:
         raise ValueError(f"Nie udało się znaleźć segmentów w odpowiedzi: {transcript}")
+
+
 
 # Funkcja do dzielenia tekstu/audio na segmenty
 def split_text_into_segments(transcription, max_duration=5, max_chars_per_second=14):
