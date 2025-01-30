@@ -6,3 +6,4 @@ imageio-ffmpeg
 pydub
 python-dotenv
 Pillow
+ffmpeg-python
