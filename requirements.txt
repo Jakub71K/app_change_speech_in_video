@@ -2,7 +2,7 @@ streamlit
 openai
 opencv-python-headless
 numpy
-imageio-ffmpeg-python
+imageio-ffmpeg
 pydub
 python-dotenv
 Pillow
