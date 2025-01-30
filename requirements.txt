@@ -2,14 +2,7 @@ streamlit
 openai
 opencv-python-headless
 numpy
-imageio-ffmpeg
+ffmpeg-python
 pydub
 python-dotenv
 Pillow
-ffmpeg-python
-os
-tempfile
-subprocess
-re
-uuid
-BytesIO
