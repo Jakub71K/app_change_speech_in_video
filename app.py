@@ -53,44 +53,16 @@ def add_cost(service, amount, tokens=0):
 
 #  Funkcja do zwracania długości wideo w sekundach
 def get_video_duration(video_path):
-    # Sprawdź, czy plik istnieje i nie jest pusty
-    if not os.path.exists(video_path):
-        raise RuntimeError(f"Plik wideo nie istnieje: {video_path}")
-    if os.path.getsize(video_path) == 0:
-        raise RuntimeError(f"Plik wideo {video_path} jest pusty!")
-
-    # Spróbuj użyć OpenCV do odczytu długości wideo
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        raise RuntimeError("Nie udało się otworzyć pliku wideo!")
-
-    fps = cap.get(cv2.CAP_PROP_FPS)  # Kl/S (Frames per second)
-    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))  # Liczba klatek
-
-    cap.release()  # Zwolnij zasoby
-
-    if fps > 0 and frame_count > 0:
-        return frame_count / fps  # Oblicz długość wideo w sekundach
-
-    # Jeśli OpenCV nie działa, spróbuj użyć `ffprobe` z `imageio_ffmpeg`
-    ffmpeg_executable = ffmpeg.get_ffmpeg_exe()
-    if ffmpeg_executable:
-        ffprobe_command = [
-            ffmpeg_executable, '-i', video_path, '-show_entries', 'format=duration',
-            '-v', 'quiet', '-of', 'csv=p=0'
-        ]
-        result = subprocess.run(ffprobe_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-
-        try:
-            duration = float(result.stdout.strip())
-            return duration
-        except ValueError:
-            raise RuntimeError("Nie udało się odczytać długości wideo.")
-
-    # Jeśli OpenCV i ffprobe zawiodą, zwróć błąd
-    raise RuntimeError("Nie udało się odczytać długości wideo żadną metodą.")
-
-
+    ffprobe_command = [
+        'ffprobe', '-i', video_path, '-show_entries', 'format=duration',
+        '-v', 'quiet', '-of', 'csv=p=0'
+    ]
+    result = subprocess.run(ffprobe_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        duration = float(result.stdout.strip())
+        return duration
+    except ValueError:
+        raise RuntimeError("Nie udało się odczytać długości wideo.")
 
 # Funkcja do wyodrębnienia audio z wideo za pomocą ffmpeg
 def extract_audio(video_path):
