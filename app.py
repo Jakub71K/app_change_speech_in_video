@@ -166,9 +166,9 @@ def translate_audio(audio_bytes):
             # Tworzenie segmentów na podstawie odpowiedzi
             segments = [
                 {
-                    "word": re.sub(r"[^\w\s]", "", segment["text"]),
-                    "start": segment.get("start", 0),
-                    "end": segment.get("end", 0)
+                    "word": re.sub(r"[^\w\s]", "", segment.text),  # Poprawnie używamy segment.text
+                    "start": getattr(segment, "start", 0),  # Użycie getattr() zamiast segment.get()
+                    "end": getattr(segment, "end", 0)
                 }
                 for segment in response.segments
             ]
@@ -180,6 +180,7 @@ def translate_audio(audio_bytes):
             raise RuntimeError("Odpowiedź tłumaczenia jest pusta lub nie zawiera segmentów.")
     except Exception as e:
         raise RuntimeError(f"Błąd podczas tłumaczenia audio: {e}")
+
 
 # Funkcja do generowania nowego audio na podstawie edytowanego tekstu
 def generate_audio_from_text(transcription, voice):
