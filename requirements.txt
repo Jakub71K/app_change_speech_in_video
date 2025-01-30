@@ -7,3 +7,9 @@ pydub
 python-dotenv
 Pillow
 ffmpeg-python
+os
+tempfile
+subprocess
+re
+uuid
+BytesIO
