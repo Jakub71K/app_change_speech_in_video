@@ -53,8 +53,12 @@ def add_cost(service, amount, tokens=0):
 
 #  Funkcja do zwracania długości wideo w sekundach
 def get_video_duration(video_path):
+    ffmpeg_executable = ffmpeg.get_ffmpeg_exe()
+    if ffmpeg_executable is None:
+        raise RuntimeError("Nie można znaleźć FFmpeg w środowisku.")
+
     ffprobe_command = [
-        'ffprobe', '-i', video_path, '-show_entries', 'format=duration',
+        ffmpeg_executable, '-i', video_path, '-show_entries', 'format=duration',
         '-v', 'quiet', '-of', 'csv=p=0'
     ]
     result = subprocess.run(ffprobe_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -63,6 +67,7 @@ def get_video_duration(video_path):
         return duration
     except ValueError:
         raise RuntimeError("Nie udało się odczytać długości wideo.")
+
 
 # Funkcja do wyodrębnienia audio z wideo za pomocą ffmpeg
 def extract_audio(video_path):
