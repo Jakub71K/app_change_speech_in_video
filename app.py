@@ -299,16 +299,16 @@ def combine_video_with_audio(video_path, audio_path, output_path):
         error_message = process.stderr if process.stderr else "Nieznany błąd FFmpeg"
         raise RuntimeError(f"Błąd FFmpeg: {error_message}")
     
-if "video" in st.session_state and "audio" in st.session_state:
-    if st.session_state.video and st.session_state.audio:
-        output_video_path = os.path.join("/tmp", f"output_video_{uuid.uuid4()}.mp4")
+    if "video" in st.session_state and "audio" in st.session_state:
+        if st.session_state.video and st.session_state.audio:
+            output_video_path = os.path.join("/tmp", f"output_video_{uuid.uuid4()}.mp4")
 
-        # Upewnij się, że zawsze używane jest nowe audio
-        if not os.path.exists(st.session_state.audio) or os.path.getsize(st.session_state.audio) == 0:
-            st.error("Nie znaleziono wygenerowanego pliku audio! Upewnij się, że zapisano zmiany.")
-        else:
-            combine_video_with_audio(st.session_state.video, st.session_state.audio, output_video_path)
-            st.success("Scalanie zakończone!")
+            # Upewnij się, że zawsze używane jest nowe audio
+            if not os.path.exists(st.session_state.audio) or os.path.getsize(st.session_state.audio) == 0:
+                st.error("Nie znaleziono wygenerowanego pliku audio! Upewnij się, że zapisano zmiany.")
+            else:
+                combine_video_with_audio(st.session_state.video, st.session_state.audio, output_video_path)
+                st.success("Scalanie zakończone!")
 
 # Funkcja weryfikująca poprawność klucza API OpenAI, sprawdzając możliwość wykonania zapytania testowego.
 def verify_openai_api_key(api_key):
@@ -623,10 +623,8 @@ def main():
                     try:
                         generated_audio_path = generate_audio_from_text(st.session_state.transcription, voice_option)
                         st.session_state.audio = generated_audio_path
-                        st.session_state.audio_updated = True  # Nowa flaga informująca, że audio zostało zaktualizowane
                         st.success("Nowe audio zostało wygenerowane! Teraz czas na scalenie nowego audio z oryginalnym wideo.")
                         st.session_state.changes_saved = True
-
 
                         if os.path.exists(generated_audio_path):
                             with open(generated_audio_path, "rb") as audio_file:
