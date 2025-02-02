@@ -456,16 +456,21 @@ def main():
         if "OPENAI_API_KEY" in env:
             st.session_state["openai_api_key"] = env["OPENAI_API_KEY"]
         else:
-            st.info("Dodaj swój klucz API OpenAI, aby móc korzystać z tej aplikacji")
-            st.session_state["openai_api_key"] = st.text_input("Klucz API", type="password")
-            # Sprawdź format klucza
-            if re.match(r'^sk-[A-Za-z0-9]{48}$', st.session_state["openai_api_key"]):
-                if verify_openai_api_key(st.session_state["openai_api_key"]):
-                    st.success("Klucz API jest prawidłowy. Możesz korzystać z aplikacji.")
-                    st.rerun()  # Przeładuj aplikację
+            st.info("🔑 Dodaj swój klucz API OpenAI, aby móc korzystać z tej aplikacji.")
+            api_key_input = st.text_input("Klucz API OpenAI", type="password")
+
+            if api_key_input:
+                if re.match(r'^sk-[A-Za-z0-9]{48}$', api_key_input):  # Sprawdza format klucza
+                    if verify_openai_api_key(api_key_input):  # Sprawdza poprawność klucza
+                        st.session_state["openai_api_key"] = api_key_input
+                        st.success("Klucz API jest poprawny! Możesz korzystać z aplikacji.")
+                        st.rerun()
+                    else:
+                        st.error("Niepoprawny klucz API OpenAI. Wprowadź poprawny klucz!")
                 else:
-                    st.error("Nieprawidłowy klucz API. Wprowadź poprawny klucz.")
-                    st.stop
+                    st.warning("Klucz API wygląda na niepoprawny. Upewnij się, że jest prawidłowy.")
+                    st.stop()
+
 
     if not st.session_state.get("openai_api_key"):
         st.stop()
