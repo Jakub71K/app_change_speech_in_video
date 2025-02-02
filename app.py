@@ -303,33 +303,30 @@ def combine_video_with_audio(video_path, audio_path, output_path):
 if "video" in st.session_state and "audio" in st.session_state:
     if st.session_state.video and st.session_state.audio:
         output_video_path = os.path.join(tempfile.gettempdir(), f"output_video_{uuid.uuid4()}.mp4")
-
-        #  Debugowanie: Sprawdź, czy audio istnieje
-        st.write(f"🔎 Używane audio przed scaleniem: {st.session_state.audio}")
-        
+       
         if not os.path.exists(st.session_state.audio) or os.path.getsize(st.session_state.audio) == 0:
             st.error(" Nie znaleziono wygenerowanego pliku audio! Upewnij się, że zapisano zmiany.")
         else:
             combine_video_with_audio(st.session_state.video, st.session_state.audio, output_video_path)
-            st.success("Scalanie zakończone!")
-
-            #  Debugowanie: Sprawdź, czy nowe wideo istnieje
             if os.path.exists(output_video_path):
-                st.write(f" Nowe wideo zapisane.")
+                st.success("Scalanie zakończone!")
             else:
                 st.error(" Nie udało się zapisać nowego pliku wideo.")
 
 # Funkcja weryfikująca poprawność klucza API OpenAI, sprawdzając możliwość wykonania zapytania testowego.
 def verify_openai_api_key(api_key):
+    """Sprawdza, czy podany klucz API OpenAI jest poprawny"""
     try:
-        # Ustaw klucz API
-        openai.api_key = api_key
-        # Wykonaj testowe zapytanie (np. lista modeli)
-        openai.Model.list()
-        return True
-    except openai.error.AuthenticationError:
+        client = OpenAI(api_key=api_key)  # Tworzy klienta OpenAI
+        client.models.list()  # Próbuje pobrać listę modeli OpenAI (test poprawności klucza)
+        return True  # Klucz jest poprawny
+    except openai.APIError as e:
+        st.error(f"Wystąpił błąd API: {e}")
         return False
-    except Exception as e:
+    except openai.AuthenticationError:
+        st.error("Niepoprawny klucz API OpenAI. Wprowadź poprawny klucz!")
+        return False
+    except openai.OpenAIError as e:
         st.error(f"Wystąpił błąd: {e}")
         return False
 
@@ -407,12 +404,6 @@ def add_text_to_video(video_path, output_path, transcription, font_path="arial.t
 
     cap.release()
     out.release()
-
-    # Sprawdź, czy plik wideo został wygenerowany poprawnie
-    if os.path.exists(output_path):
-        st.write("Plik wideo z napisami został utworzony.")
-    else:
-        st.error("Nie udało się utworzyć pliku wideo z napisami.")
 
 # Funkcja tłumacząca tekst za pomocą modelu GPT
 def translate_text_to_polish(text, openai_api_key):
