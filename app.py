@@ -66,13 +66,15 @@ def get_video_duration(video_path):
 
 # Funkcja do wyodrębnienia audio z wideo za pomocą ffmpeg
 def extract_audio(video_path):
-    temp_file = tempfile.NamedTemporaryFile(suffix='.mp3', delete=False)
-    audio_path = temp_file.name
-    command = [
-        'ffmpeg', '-i', video_path, '-q:a', '0', '-map', 'a', audio_path, '-y'
-    ]
-    subprocess.run(command, check=True)
-    return audio_path
+    audio_path = os.path.join("/tmp", f"{uuid.uuid4()}.mp3")  
+    command = ['ffmpeg', '-i', video_path, '-q:a', '0', '-map', 'a', audio_path, '-y']
+
+    try:
+        result = subprocess.run(command, check=True, capture_output=True, text=True)
+        return audio_path  # Zwrot poprawnej ścieżki, jeśli ffmpeg się powiodło
+    except subprocess.CalledProcessError as e:
+        st.error(f" Błąd FFmpeg podczas ekstrakcji audio: {e.stderr}")
+        return None  # Zwracamy `None`, aby program nie kontynuował z błędnym plikiem
 
 def format_time(seconds):
     minutes, seconds = divmod(int(seconds), 60)
@@ -188,7 +190,7 @@ def generate_audio_from_text(transcription, voice):
         raise ValueError("Nieprawidłowe dane transkrypcji. Sprawdź segmenty.")
 
     audio_segments = []
-    mp3_audio_path = os.path.join(tempfile.gettempdir(), f"generated_audio_{uuid.uuid4()}.mp3")
+    mp3_audio_path = os.path.join("/tmp", f"generated_audio_{uuid.uuid4()}.mp3")
 
     num_chars = sum(len(entry["word"]) for entry in transcription)  # Liczenie znaków w transkrypcji
 
@@ -211,7 +213,7 @@ def generate_audio_from_text(transcription, voice):
                 )
 
                 # Zapis na plik tymczasowy
-                segment_audio_path = os.path.join(tempfile.gettempdir(), f"segment_{uuid.uuid4()}.mp3")
+                segment_audio_path = os.path.join("/tmp", f"segment_{uuid.uuid4()}.mp3")
                 with open(segment_audio_path, "wb") as f:
                     f.write(response.content)
 
@@ -226,7 +228,7 @@ def generate_audio_from_text(transcription, voice):
                     silence_gap = segment_duration_ms - audio_duration_ms
                     segment_audio += AudioSegment.silent(duration=silence_gap)
 
-                elif audio_duration_ms > segment_duration_ms:
+                elif audio_duration_ms > segment_duration_ms and speed_factor > 1.0:
                     # Jeśli audio jest za długie, zamiast ucinać, przyspiesz segment
                     speed_factor = audio_duration_ms / segment_duration_ms
                     segment_audio = speedup(segment_audio, playback_speed=speed_factor)
@@ -293,7 +295,14 @@ def combine_video_with_audio(video_path, audio_path, output_path):
     ]
     process = subprocess.run(command, capture_output=True, text=True)
     if process.returncode != 0:
-        raise RuntimeError(f"Błąd FFmpeg: {process.stderr}")
+        error_message = process.stderr if process.stderr else "Nieznany błąd FFmpeg"
+        raise RuntimeError(f"Błąd FFmpeg: {error_message}")
+    
+if st.session_state.video and st.session_state.audio:
+    output_video_path = os.path.join("/tmp", f"output_video_{uuid.uuid4()}.mp4")
+    combine_video_with_audio(st.session_state.video, st.session_state.audio, output_video_path)
+
+
 
 # Funkcja weryfikująca poprawność klucza API OpenAI, sprawdzając możliwość wykonania zapytania testowego.
 def verify_openai_api_key(api_key):
@@ -311,9 +320,12 @@ def verify_openai_api_key(api_key):
 
 # Funkcja dodająca tekst do video
 def add_text_to_video(video_path, output_path, transcription, font_path="arial.ttf", font_size=24):
+    temp_video_path = os.path.join("/tmp", f"temp_video_with_text_{uuid.uuid4()}.mp4") 
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
-        raise RuntimeError("Nie można otworzyć pliku wideo.")
+        st.error("Nie można otworzyć pliku wideo. Upewnij się, że format jest obsługiwany.")
+        return
+
 
     # Pobierz informacje o wideo
     fps = int(cap.get(cv2.CAP_PROP_FPS))
@@ -644,7 +656,7 @@ def main():
                 # Drugi przycisk: Scal audio, wideo i dodaj napisy
                 if st.button("Scal audio i wideo oraz dodaj napisy"):
                     with st.spinner("Proszę czekać"):
-                        temp_video_path = os.path.join(tempfile.gettempdir(), f"temp_video_with_text_{uuid.uuid4()}.mp4")
+                        temp_video_path = os.path.join("/tmp", f"temp_video_with_text_{uuid.uuid4()}.mp4")
                         output_video_path = os.path.join(tempfile.gettempdir(), f"output_video_with_text_and_audio_{uuid.uuid4()}.mp4")
                         try:
                             # Dodaj tekst do wideo

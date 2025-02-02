@@ -2,3 +2,5 @@ ffmpeg
 libsm6
 libxext6
 libavcodec-extra
+libgl1
+tesseract-ocr
