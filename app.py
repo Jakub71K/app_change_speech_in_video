@@ -299,7 +299,7 @@ def combine_video_with_audio(video_path, audio_path, output_path):
         error_message = process.stderr if process.stderr else "Nieznany błąd FFmpeg"
         raise RuntimeError(f"Błąd FFmpeg: {error_message}")
     
-    if "video" in st.session_state and "audio" in st.session_state:
+    elif "video" in st.session_state and "audio" in st.session_state:
         if st.session_state.video and st.session_state.audio:
             output_video_path = os.path.join("/tmp", f"output_video_{uuid.uuid4()}.mp4")
 
