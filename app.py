@@ -334,16 +334,34 @@ def verify_openai_api_key(api_key):
         return False
 
 # Funkcja dodająca tekst do video
-def add_text_to_video(video_path, output_path, transcription, font_path=None, font_size=24):
+def add_text_to_video(video_path, output_path, transcription, font_path="arial.ttf", font_size=24):
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
-        st.error("Nie można otworzyć pliku wideo. Upewnij się, że format jest obsługiwany.")
-        return
+        raise RuntimeError("Nie można otworzyć pliku wideo.")
 
+    # Pobierz informacje o wideo
     fps = int(cap.get(cv2.CAP_PROP_FPS))
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Kodek do zapisu
+
+    # Dynamiczne skalowanie wielkości czcionki
+    font_scale = max(0.5, min(2, width / 1280))  # Skalowanie w stosunku do rozdzielczości
+    adjusted_font_size = int(font_size * font_scale)
+
+    # Załaduj poprawną czcionkę obsługującą polskie znaki
+    font_paths = [
+        "/usr/share/fonts/truetype/msttcorefonts/Arial.ttf",  # Linux
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",  # Linux (alternatywa)
+        "/Library/Fonts/Arial.ttf",  # MacOS
+        "C:/Windows/Fonts/arial.ttf",  # Windows
+    ]
+    font_path = next((path for path in font_paths if os.path.exists(path)), font_path)
+
+    try:
+        font = ImageFont.truetype(font_path, adjusted_font_size)
+    except IOError:
+        raise RuntimeError(f"Nie można załadować czcionki: {font_path}")
 
     out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
@@ -356,16 +374,35 @@ def add_text_to_video(video_path, output_path, transcription, font_path=None, fo
         if not ret:
             break
 
+        # Oblicz aktualny czas w sekundach
         current_time = frame_idx / fps
 
-        while transcription_index < len(transcription) and current_time >= transcription[transcription_index]["start"]:
+        # Aktualizuj tekst na podstawie czasu
+        while (transcription_index < len(transcription) and
+               current_time >= transcription[transcription_index]["start"]):
             current_text = transcription[transcription_index]["word"]
             transcription_index += 1
 
+        # Rysuj tekst na ramce za pomocą PIL
         if current_text:
+            # Konwertuj ramkę (OpenCV) na format PIL
             frame_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
             draw = ImageDraw.Draw(frame_pil)
-            draw.text((10, height - 50), current_text, font=ImageFont.load_default(), fill=(255, 255, 255))
+
+            # Oblicz pozycję tekstu na środku ekranu
+            text_bbox = draw.textbbox((0, 0), current_text, font=font)  # Pobierz rozmiar tekstu
+            text_width = text_bbox[2] - text_bbox[0]
+            text_height = text_bbox[3] - text_bbox[1]
+            text_x = (width - text_width) // 2  # Wyśrodkowanie tekstu
+            text_y = height - 50  # Pozycja tekstu na dole
+
+            # Debugowanie
+            st.write(f"📍 Tekst: '{current_text}' | Pozycja: x={text_x}, y={text_y}")
+
+            # Rysuj tekst na wideo
+            draw.text((text_x, text_y), current_text, font=font, fill=(255, 255, 255))
+
+            # Konwertuj ramkę z powrotem na format OpenCV
             frame = cv2.cvtColor(np.array(frame_pil), cv2.COLOR_RGB2BGR)
 
         out.write(frame)
@@ -374,7 +411,7 @@ def add_text_to_video(video_path, output_path, transcription, font_path=None, fo
     cap.release()
     out.release()
 
-    # 🟢 Logowanie czy plik istnieje
+    # Sprawdź, czy plik wideo został wygenerowany poprawnie
     if os.path.exists(output_path):
         st.write(f"✅ Plik napisów utworzony: {output_path}")
     else:
