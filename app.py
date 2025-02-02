@@ -410,9 +410,9 @@ def add_text_to_video(video_path, output_path, transcription, font_path="arial.t
 
     # Sprawdź, czy plik wideo został wygenerowany poprawnie
     if os.path.exists(output_path):
-        st.write(f"✅ Plik napisów utworzony: {output_path}")
+        st.write("Plik wideo z napisami został utworzony.")
     else:
-        st.error(f"🚨 Nie udało się utworzyć pliku wideo z napisami: {output_path}")
+        st.error("Nie udało się utworzyć pliku wideo z napisami.")
 
 # Funkcja tłumacząca tekst za pomocą modelu GPT
 def translate_text_to_polish(text, openai_api_key):
