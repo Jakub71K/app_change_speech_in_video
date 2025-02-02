@@ -393,7 +393,8 @@ def add_text_to_video(video_path, output_path, transcription, font_path="arial.t
 
             for word in words:
                 test_line = f"{line} {word}".strip()
-                text_width, _ = draw.textsize(test_line, font=font)
+                text_bbox = draw.textbbox((0, 0), test_line, font=font)
+                text_width = text_bbox[2] - text_bbox[0]
 
                 if text_width <= max_text_width:
                     line = test_line
@@ -405,7 +406,8 @@ def add_text_to_video(video_path, output_path, transcription, font_path="arial.t
                 wrapped_lines.append(line)
 
             # Oblicz wysokość wszystkich linii
-            line_height = draw.textsize("Test", font=font)[1] + 5  # +5 dla separacji
+            text_bbox = draw.textbbox((0, 0), "Test", font=font)
+            line_height = (text_bbox[3] - text_bbox[1]) + 5  # +5 dla separacji
             total_text_height = len(wrapped_lines) * line_height
 
             # Pozycja startowa (nie niżej niż 50 pikseli od dołu)
@@ -413,7 +415,8 @@ def add_text_to_video(video_path, output_path, transcription, font_path="arial.t
 
             # Rysowanie każdej linii
             for i, line in enumerate(wrapped_lines):
-                text_width, _ = draw.textsize(line, font=font)
+                text_bbox = draw.textbbox((0, 0), line, font=font)
+                text_width = text_bbox[2] - text_bbox[0]
                 text_x = (width - text_width) // 2  # Wyśrodkowanie
                 text_y = start_y + i * line_height
                 draw.text((text_x, text_y), line, font=font, fill=(255, 255, 255))
