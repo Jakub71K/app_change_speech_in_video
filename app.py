@@ -197,10 +197,12 @@ def generate_audio_from_text(transcription, voice):
         start = entry.get("start", 0)
         end = entry.get("end", 0)
 
+        # Czas trwania segmentu w milisekundach
         segment_duration_ms = int((end - start) * 1000)
 
         try:
             if text:
+                # Generowanie audio z tekstu
                 openai_client = get_openai_client()
                 response = openai_client.audio.speech.create(
                     model="tts-1",
@@ -208,22 +210,28 @@ def generate_audio_from_text(transcription, voice):
                     input=text
                 )
 
+                # Zapis na plik tymczasowy
                 segment_audio_path = os.path.join(tempfile.gettempdir(), f"segment_{uuid.uuid4()}.mp3")
                 with open(segment_audio_path, "wb") as f:
                     f.write(response.content)
 
+                # Załaduj segment audio
                 segment_audio = AudioSegment.from_file(segment_audio_path, format="mp3")
 
+                # Dostosowanie długości segmentu do docelowej
                 audio_duration_ms = len(segment_audio)
 
                 if audio_duration_ms < segment_duration_ms:
+                    # Jeśli audio jest za krótkie, dodaj ciszę
                     silence_gap = segment_duration_ms - audio_duration_ms
                     segment_audio += AudioSegment.silent(duration=silence_gap)
 
                 elif audio_duration_ms > segment_duration_ms:
+                    # Jeśli audio jest za długie, zamiast ucinać, przyspiesz segment
                     speed_factor = audio_duration_ms / segment_duration_ms
                     segment_audio = speedup(segment_audio, playback_speed=speed_factor)
             else:
+                # Jeśli segment nie zawiera tekstu, dodaj ciszę
                 segment_audio = AudioSegment.silent(duration=segment_duration_ms)
             audio_segments.append(segment_audio)
         except Exception as e:
@@ -231,15 +239,15 @@ def generate_audio_from_text(transcription, voice):
 
     if audio_segments:
         try:
+            # Połączenie wszystkich segmentów audio
             combined_audio = sum(audio_segments)
             combined_audio.export(mp3_audio_path, format="mp3", bitrate="192k", parameters=["-q:a", "0", "-ar", "44100"])
         
+            # Oblicz koszt generowania audio (TTS-1: 0.015 USD za 1K znaków)
             add_cost("tts-1", num_chars / 1000)
 
-            # 🔥 KLUCZOWA ZMIANA: Zapisz nowe audio do `st.session_state`
-            st.session_state["audio"] = mp3_audio_path  
-
         finally:
+            # Zwolnienie pamięci używanej przez segmenty
             for segment in audio_segments:
                 del segment
 
