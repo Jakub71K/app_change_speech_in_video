@@ -335,33 +335,50 @@ def verify_openai_api_key(api_key):
 
 # Funkcja dodająca tekst do video
 def add_text_to_video(video_path, output_path, transcription, font_path=None, font_size=24):
-    temp_video_path = os.path.join("/tmp", f"temp_video_with_text_{uuid.uuid4()}.mp4") 
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         st.error("Nie można otworzyć pliku wideo. Upewnij się, że format jest obsługiwany.")
         return
 
-    # Domyślna ścieżka do czcionki Arial (dla różnych systemów)
-    if font_path is None:
-        possible_fonts = [
-            "/usr/share/fonts/truetype/msttcorefonts/Arial.ttf",  # Linux (jeśli pakiet czcionek MS jest zainstalowany)
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",  # Alternatywa dla Linuxa
-            "/Library/Fonts/Arial.ttf",  # MacOS
-            "C:/Windows/Fonts/Arial.ttf",  # Windows
-        ]
-        for path in possible_fonts:
-            if os.path.exists(path):
-                font_path = path
-                break
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Kodek do zapisu
 
-        if font_path is None:
-            st.error("Nie znaleziono czcionki Arial! Spróbuj zainstalować ją w systemie.")
-            return
+    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
-    try:
-        font = ImageFont.truetype(font_path, font_size)
-    except IOError:
-        raise RuntimeError(f"Nie można załadować czcionki: {font_path}")
+    frame_idx = 0
+    current_text = ""
+    transcription_index = 0
+
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        current_time = frame_idx / fps
+
+        while transcription_index < len(transcription) and current_time >= transcription[transcription_index]["start"]:
+            current_text = transcription[transcription_index]["word"]
+            transcription_index += 1
+
+        if current_text:
+            frame_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            draw = ImageDraw.Draw(frame_pil)
+            draw.text((10, height - 50), current_text, font=ImageFont.load_default(), fill=(255, 255, 255))
+            frame = cv2.cvtColor(np.array(frame_pil), cv2.COLOR_RGB2BGR)
+
+        out.write(frame)
+        frame_idx += 1
+
+    cap.release()
+    out.release()
+
+    # 🟢 Logowanie czy plik istnieje
+    if os.path.exists(output_path):
+        st.write(f"✅ Plik napisów utworzony: {output_path}")
+    else:
+        st.error(f"🚨 Nie udało się utworzyć pliku wideo z napisami: {output_path}")
 
 # Funkcja tłumacząca tekst za pomocą modelu GPT
 def translate_text_to_polish(text, openai_api_key):
