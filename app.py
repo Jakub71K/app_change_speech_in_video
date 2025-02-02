@@ -316,7 +316,6 @@ if "video" in st.session_state and "audio" in st.session_state:
             #  Debugowanie: Sprawdź, czy nowe wideo istnieje
             if os.path.exists(output_video_path):
                 st.write(f" Nowe wideo zapisane jako: {output_video_path}")
-                st.video(output_video_path)
             else:
                 st.error(" Nie udało się zapisać nowego pliku wideo.")
 
