@@ -330,25 +330,25 @@ def verify_openai_api_key(api_key):
         return False  # Nieoczekiwany błąd
 
 # Funkcja dodająca tekst do video
-def add_text_to_video(video_path, output_path, transcription, font_path="arial.ttf", font_size=24):
+def add_text_to_video(video_path, output_path, transcription, font_path="arial.ttf", font_size=24, max_line_width_ratio=0.8):
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         raise RuntimeError("Nie można otworzyć pliku wideo.")
 
-    # Pobierz informacje o wideo
+    # Pobranie parametrów wideo
     fps = int(cap.get(cv2.CAP_PROP_FPS))
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Kodek do zapisu
 
-    # Dynamiczne skalowanie wielkości czcionki
-    font_scale = max(0.5, min(2, width / 1280))  # Skalowanie w stosunku do rozdzielczości
+    # Skalowanie czcionki na podstawie rozdzielczości wideo
+    font_scale = max(0.5, min(2, width / 1280))  
     adjusted_font_size = int(font_size * font_scale)
 
-    # Załaduj poprawną czcionkę obsługującą polskie znaki
+    # Ścieżki do czcionek (Windows, Linux, MacOS)
     font_paths = [
         "/usr/share/fonts/truetype/msttcorefonts/Arial.ttf",  # Linux
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",  # Linux (alternatywa)
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",  # Alternatywa Linux
         "/Library/Fonts/Arial.ttf",  # MacOS
         "C:/Windows/Fonts/arial.ttf",  # Windows
     ]
@@ -374,28 +374,51 @@ def add_text_to_video(video_path, output_path, transcription, font_path="arial.t
         current_time = frame_idx / fps
 
         # Aktualizuj tekst na podstawie czasu
-        while (transcription_index < len(transcription) and
-               current_time >= transcription[transcription_index]["start"]):
+        while transcription_index < len(transcription) and current_time >= transcription[transcription_index]["start"]:
             current_text = transcription[transcription_index]["word"]
             transcription_index += 1
 
-        # Rysuj tekst na ramce za pomocą PIL
+        # Rysowanie napisów
         if current_text:
-            # Konwertuj ramkę (OpenCV) na format PIL
             frame_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
             draw = ImageDraw.Draw(frame_pil)
 
-            # Oblicz pozycję tekstu na środku ekranu
-            text_bbox = draw.textbbox((0, 0), current_text, font=font)  # Pobierz rozmiar tekstu
-            text_width = text_bbox[2] - text_bbox[0]
-            text_height = text_bbox[3] - text_bbox[1]
-            text_x = (width - text_width) // 2  # Wyśrodkowanie tekstu
-            text_y = height - 50  # Pozycja tekstu na dole
+            # Maksymalna szerokość tekstu (np. 80% szerokości wideo)
+            max_text_width = int(width * max_line_width_ratio)
 
-            # Rysuj tekst na wideo
-            draw.text((text_x, text_y), current_text, font=font, fill=(255, 255, 255))
+            # Podział tekstu na linie na podstawie szerokości
+            words = current_text.split()
+            wrapped_lines = []
+            line = ""
 
-            # Konwertuj ramkę z powrotem na format OpenCV
+            for word in words:
+                test_line = f"{line} {word}".strip()
+                text_width, _ = draw.textsize(test_line, font=font)
+
+                if text_width <= max_text_width:
+                    line = test_line
+                else:
+                    wrapped_lines.append(line)
+                    line = word  # Nowa linia zaczyna się od tego słowa
+
+            if line:
+                wrapped_lines.append(line)
+
+            # Oblicz wysokość wszystkich linii
+            line_height = draw.textsize("Test", font=font)[1] + 5  # +5 dla separacji
+            total_text_height = len(wrapped_lines) * line_height
+
+            # Pozycja startowa (nie niżej niż 50 pikseli od dołu)
+            start_y = max(height - total_text_height - 50, 50)
+
+            # Rysowanie każdej linii
+            for i, line in enumerate(wrapped_lines):
+                text_width, _ = draw.textsize(line, font=font)
+                text_x = (width - text_width) // 2  # Wyśrodkowanie
+                text_y = start_y + i * line_height
+                draw.text((text_x, text_y), line, font=font, fill=(255, 255, 255))
+
+            # Konwersja ramki z powrotem na OpenCV
             frame = cv2.cvtColor(np.array(frame_pil), cv2.COLOR_RGB2BGR)
 
         out.write(frame)
@@ -569,90 +592,100 @@ def main():
     else:
         st.session_state.transcription = []
 
-    # Edycja transkrypcji
+    # Edycja transkrypcji (zatrzymuje automatyczne przeładowanie Streamlit)
     if st.session_state.transcription:
-        st.write("Edycja transkrypcji")
-        transcription_valid = True
+        with st.form("edit_transcription_form"):
+            st.write("✍️ **Edycja transkrypcji**")
+            transcription_valid = True
 
-        for i, entry in enumerate(st.session_state.transcription):
-            start = entry.get("start", 0)
-            end = entry.get("end", 0)
-            segment_duration = end - start
+            edited_transcription = []
+            for i, entry in enumerate(st.session_state.transcription):
+                start = entry.get("start", 0)
+                end = entry.get("end", 0)
+                segment_duration = end - start
 
-            if start is None or not isinstance(start, (int, float)):
-                st.error(f"Wpis {i}: 'start' jest nieprawidłowy (wartość: {start}).")
-                transcription_valid = False
-                continue
+                if start is None or not isinstance(start, (int, float)):
+                    st.error(f"Wpis {i}: 'start' jest nieprawidłowy (wartość: {start}).")
+                    transcription_valid = False
+                    continue
 
-            if end is None or not isinstance(end, (int, float)):
-                st.error(f"Wpis {i}: 'end' jest nieprawidłowy (wartość: {end}).")
-                transcription_valid = False
-                continue
+                if end is None or not isinstance(end, (int, float)):
+                    st.error(f"Wpis {i}: 'end' jest nieprawidłowy (wartość: {end}).")
+                    transcription_valid = False
+                    continue
 
-            if end < start:
-                st.error(f"Wpis {i}: 'end' ({end}) jest mniejszy niż 'start' ({start}).")
-                transcription_valid = False
-                continue
+                if end < start:
+                    st.error(f"Wpis {i}: 'end' ({end}) jest mniejszy niż 'start' ({start}).")
+                    transcription_valid = False
+                    continue
 
-            # Oryginalny tekst segmentu
-            original_text = entry["word"]
-            original_max_chars = len(original_text)
+                # Oryginalny tekst segmentu
+                original_text = entry["word"]
+                original_max_chars = len(original_text)
 
-            # Maksymalna liczba znaków (oryginalna liczba znaków lub dynamiczny limit)
-            dynamic_max_chars = int(segment_duration * TTS_SPEED)
-            max_chars = max(original_max_chars, dynamic_max_chars)
+                # Maksymalna liczba znaków (oryginalna liczba znaków lub dynamiczny limit)
+                dynamic_max_chars = int(segment_duration * TTS_SPEED)
+                max_chars = max(original_max_chars, dynamic_max_chars)
 
-            # Formatowanie czasu na mm:ss
-            formatted_start = format_time(start)
-            formatted_end = format_time(end)
+                # Formatowanie czasu na mm:ss
+                formatted_start = format_time(start)
+                formatted_end = format_time(end)
 
-            current_text = entry["word"]
-            edited_text = st.text_input(
-                f"Od {formatted_start} do {formatted_end}, max {max_chars} znaków):",
-                value=current_text,
-                key=f"text_input_{i}",
-                max_chars=max_chars
-            )
-
-            # Sprawdzanie długości wprowadzanego tekstu
-            if len(edited_text) > max_chars:
-                st.warning(
-                    f"Segment {i}: Tekst przekracza maksymalną długość {max_chars} znaków. "
-                    "Zostanie obcięty."
+                current_text = entry["word"]
+                edited_text = st.text_area(
+                    f"Od {formatted_start} do {formatted_end} (max {max_chars} znaków):",
+                    value=current_text,
+                    key=f"text_input_{i}",
+                    max_chars=max_chars
                 )
-                edited_text = edited_text[:max_chars]
 
-            entry["word"] = edited_text
+                # Sprawdzanie długości wprowadzanego tekstu
+                if len(edited_text) > max_chars:
+                    st.warning(
+                        f"Segment {i}: Tekst przekracza maksymalną długość {max_chars} znaków. "
+                        "Zostanie obcięty."
+                    )
+                    edited_text = edited_text[:max_chars]
 
-        if transcription_valid:
-            voice_option = st.selectbox(
-                "Wybierz głos:", 
-                ["alloy", "ash", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer"], 
-                index=0
-            )
+                # Dodajemy zmodyfikowany segment do listy
+                edited_transcription.append({
+                    "word": edited_text,
+                    "start": start,
+                    "end": end
+                })
 
-            if st.button("Zapisz zmiany"):
-                with st.spinner("Proszę czekać"):
-                    transcription_path = os.path.join(tempfile.gettempdir(), "transcription.txt")
-                    with open(transcription_path, "w") as f:
-                        for entry in st.session_state.transcription:
-                            f.write(f"{entry['start']:.2f} {entry['end']:.2f} {entry['word']}\n")
-                    st.spinner(text="Proszę czekać, analizujemy dane")
+            # Przycisk do zapisania wszystkich zmian
+            save_changes = st.form_submit_button("💾 Zapisz zmiany")
+            if save_changes and transcription_valid:
+                st.session_state.transcription = edited_transcription
+                st.success("Zmiany zostały zapisane!")
 
+                # Generowanie nowego audio po zapisaniu zmian
+                with st.spinner("Generowanie nowego pliku audio..."):
                     try:
+                        voice_option = st.selectbox(
+                            "🎙 Wybierz głos:",
+                            ["alloy", "ash", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer"],
+                            index=0
+                        )
+                        
                         generated_audio_path = generate_audio_from_text(st.session_state.transcription, voice_option)
                         st.session_state.audio = generated_audio_path
-                        st.success("Nowe audio zostało wygenerowane! Teraz czas na scalenie nowego audio z oryginalnym wideo.")
-                        st.session_state.changes_saved = True
+                        st.success("🔊 Nowe audio zostało wygenerowane!")
 
+                        # Odtwarzanie nowego pliku audio
                         if os.path.exists(generated_audio_path):
                             with open(generated_audio_path, "rb") as audio_file:
                                 audio_bytes = audio_file.read()
                                 st.audio(audio_bytes, format="audio/mp3")
                         else:
                             st.error("Nie można znaleźć wygenerowanego pliku audio")
+
                     except Exception as e:
                         st.error(f"Błąd podczas generowania nowego audio: {str(e)}")
+
+                st.session_state.changes_saved = True
+
 
         if not st.session_state.changes_saved:
             st.info("Aby przejść dalej i móc scalić audio i wideo oraz dodać napisy zapisz zmiany.")
