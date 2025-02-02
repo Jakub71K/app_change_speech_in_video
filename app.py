@@ -320,15 +320,14 @@ def verify_openai_api_key(api_key):
         client = OpenAI(api_key=api_key)  # Tworzy klienta OpenAI
         client.models.list()  # Próbuje pobrać listę modeli OpenAI (test poprawności klucza)
         return True  # Klucz jest poprawny
-    except openai.APIError as e:
-        st.error(f"Wystąpił błąd API: {e}")
-        return False
     except openai.AuthenticationError:
-        st.error("Niepoprawny klucz API OpenAI. Wprowadź poprawny klucz!")
-        return False
+        return False  # Błędny klucz API
     except openai.OpenAIError as e:
-        st.error(f"Wystąpił błąd: {e}")
-        return False
+        st.error(f"Wystąpił błąd API: {e}")
+        return False  # Inny błąd OpenAI
+    except Exception as e:
+        st.error(f"Nieoczekiwany błąd: {e}")
+        return False  # Nieoczekiwany błąd
 
 # Funkcja dodająca tekst do video
 def add_text_to_video(video_path, output_path, transcription, font_path="arial.ttf", font_size=24):
@@ -456,20 +455,24 @@ def main():
         if "OPENAI_API_KEY" in env:
             st.session_state["openai_api_key"] = env["OPENAI_API_KEY"]
         else:
-            st.info("🔑 Dodaj swój klucz API OpenAI, aby móc korzystać z tej aplikacji.")
+            st.info("Dodaj swój klucz API OpenAI, aby móc korzystać z tej aplikacji.")
             api_key_input = st.text_input("Klucz API OpenAI", type="password")
 
             if api_key_input:
-                if re.match(r'^sk-[A-Za-z0-9]{48}$', api_key_input):  # Sprawdza format klucza
-                    if verify_openai_api_key(api_key_input):  # Sprawdza poprawność klucza
-                        st.session_state["openai_api_key"] = api_key_input
-                        st.success("Klucz API jest poprawny! Możesz korzystać z aplikacji.")
-                        st.rerun()
-                    else:
-                        st.error("Niepoprawny klucz API OpenAI. Wprowadź poprawny klucz!")
-                else:
+                # Poprawiona logika sprawdzania klucza
+                if not api_key_input.startswith("sk-") or len(api_key_input) < 20:
                     st.warning("Klucz API wygląda na niepoprawny. Upewnij się, że jest prawidłowy.")
                     st.stop()
+                
+                # Sprawdzenie poprawności klucza
+                if verify_openai_api_key(api_key_input):  
+                    st.session_state["openai_api_key"] = api_key_input
+                    st.success("Klucz API jest poprawny! Możesz korzystać z aplikacji.")
+                    st.rerun()
+                else:
+                    st.error("Niepoprawny klucz API OpenAI. Wprowadź poprawny klucz!")
+                    st.stop()
+
 
 
     if not st.session_state.get("openai_api_key"):
