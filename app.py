@@ -311,11 +311,11 @@ if "video" in st.session_state and "audio" in st.session_state:
             st.error(" Nie znaleziono wygenerowanego pliku audio! Upewnij się, że zapisano zmiany.")
         else:
             combine_video_with_audio(st.session_state.video, st.session_state.audio, output_video_path)
-            st.success("✅ Scalanie zakończone!")
+            st.success("Scalanie zakończone!")
 
             #  Debugowanie: Sprawdź, czy nowe wideo istnieje
             if os.path.exists(output_video_path):
-                st.write(f" Nowe wideo zapisane jako: {output_video_path}")
+                st.write(f" Nowe wideo zapisane.")
             else:
                 st.error(" Nie udało się zapisać nowego pliku wideo.")
 
@@ -334,74 +334,34 @@ def verify_openai_api_key(api_key):
         return False
 
 # Funkcja dodająca tekst do video
-def add_text_to_video(video_path, output_path, transcription, font_path="arial.ttf", font_size=24):
+def add_text_to_video(video_path, output_path, transcription, font_path=None, font_size=24):
     temp_video_path = os.path.join("/tmp", f"temp_video_with_text_{uuid.uuid4()}.mp4") 
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         st.error("Nie można otworzyć pliku wideo. Upewnij się, że format jest obsługiwany.")
         return
 
+    # Domyślna ścieżka do czcionki Arial (dla różnych systemów)
+    if font_path is None:
+        possible_fonts = [
+            "/usr/share/fonts/truetype/msttcorefonts/Arial.ttf",  # Linux (jeśli pakiet czcionek MS jest zainstalowany)
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",  # Alternatywa dla Linuxa
+            "/Library/Fonts/Arial.ttf",  # MacOS
+            "C:/Windows/Fonts/Arial.ttf",  # Windows
+        ]
+        for path in possible_fonts:
+            if os.path.exists(path):
+                font_path = path
+                break
 
-    # Pobierz informacje o wideo
-    fps = int(cap.get(cv2.CAP_PROP_FPS))
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Kodek do zapisu
+        if font_path is None:
+            st.error("Nie znaleziono czcionki Arial! Spróbuj zainstalować ją w systemie.")
+            return
 
-    # Dynamiczne skalowanie wielkości czcionki
-    font_scale = max(0.5, min(2, width / 1280))  # Skalowanie w stosunku do rozdzielczości
-    adjusted_font_size = int(font_size * font_scale)
-    
-    # Załaduj czcionkę obsługującą polskie znaki
     try:
-        font = ImageFont.truetype(font_path, adjusted_font_size)
+        font = ImageFont.truetype(font_path, font_size)
     except IOError:
         raise RuntimeError(f"Nie można załadować czcionki: {font_path}")
-
-    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
-
-    frame_idx = 0
-    current_text = ""
-    transcription_index = 0
-
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-
-        # Oblicz aktualny czas w sekundach
-        current_time = frame_idx / fps
-
-        # Aktualizuj tekst na podstawie czasu
-        while (transcription_index < len(transcription) and
-               current_time >= transcription[transcription_index]["start"]):
-            current_text = transcription[transcription_index]["word"]
-            transcription_index += 1
-
-        # Rysuj tekst na ramce za pomocą PIL
-        if current_text:
-            # Konwertuj ramkę (OpenCV) na format PIL
-            frame_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-            draw = ImageDraw.Draw(frame_pil)
-
-            # Oblicz pozycję tekstu
-            text_bbox = draw.textbbox((0, 0), current_text, font=font)  # Pobierz rozmiar tekstu
-            text_width = text_bbox[2] - text_bbox[0]
-            text_height = text_bbox[3] - text_bbox[1]
-            text_x = (width - text_width) // 2  # Wyśrodkowanie tekstu
-            text_y = height - 50  # Pozycja tekstu na dole
-
-            # Rysuj tekst
-            draw.text((text_x, text_y), current_text, font=font, fill=(255, 255, 255))
-
-            # Konwertuj ramkę z powrotem na format OpenCV
-            frame = cv2.cvtColor(np.array(frame_pil), cv2.COLOR_RGB2BGR)
-
-        out.write(frame)
-        frame_idx += 1
-
-    cap.release()
-    out.release()
 
 # Funkcja tłumacząca tekst za pomocą modelu GPT
 def translate_text_to_polish(text, openai_api_key):
