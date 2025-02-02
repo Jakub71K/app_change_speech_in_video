@@ -228,10 +228,11 @@ def generate_audio_from_text(transcription, voice):
                     silence_gap = segment_duration_ms - audio_duration_ms
                     segment_audio += AudioSegment.silent(duration=silence_gap)
 
-                elif audio_duration_ms > segment_duration_ms and speed_factor > 1.0:
-                    # Jeśli audio jest za długie, zamiast ucinać, przyspiesz segment
+                elif audio_duration_ms > segment_duration_ms:
                     speed_factor = audio_duration_ms / segment_duration_ms
-                    segment_audio = speedup(segment_audio, playback_speed=speed_factor)
+                    if speed_factor > 1.0:  # Sprawdzamy, czy wartość speed_factor jest poprawna
+                        segment_audio = speedup(segment_audio, playback_speed=speed_factor)
+
             else:
                 # Jeśli segment nie zawiera tekstu, dodaj ciszę
                 segment_audio = AudioSegment.silent(duration=segment_duration_ms)
