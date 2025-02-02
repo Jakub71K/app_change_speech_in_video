@@ -396,9 +396,6 @@ def add_text_to_video(video_path, output_path, transcription, font_path="arial.t
             text_x = (width - text_width) // 2  # Wyśrodkowanie tekstu
             text_y = height - 50  # Pozycja tekstu na dole
 
-            # Debugowanie
-            st.write(f"📍 Tekst: '{current_text}' | Pozycja: x={text_x}, y={text_y}")
-
             # Rysuj tekst na wideo
             draw.text((text_x, text_y), current_text, font=font, fill=(255, 255, 255))
 
