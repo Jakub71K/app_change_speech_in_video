@@ -289,26 +289,36 @@ def combine_video_with_audio(video_path, audio_path, output_path):
     ffmpeg_executable = ffmpeg.get_ffmpeg_exe()
     command = [
         ffmpeg_executable, '-i', video_path, '-i', audio_path,
-        '-c:v', 'libx264', '-crf', '23', '-preset', 'fast',  # Rekodowanie do H.264
-        '-c:a', 'aac', '-b:a', '192k',  # Kompresja dźwięku
+        '-c:v', 'libx264', '-preset', 'fast',  # Rekodowanie do H.264
+        '-c:a', 'aac', '-b:a', '192k', '-map', '0:v', '-map', '1:a', '-shortest',
         '-movflags', 'faststart',  # Optymalizacja do strumieniowania
-        output_path
+        '-y', output_path  # Wymuszenie nadpisania pliku
     ]
     process = subprocess.run(command, capture_output=True, text=True)
+
     if process.returncode != 0:
         error_message = process.stderr if process.stderr else "Nieznany błąd FFmpeg"
         raise RuntimeError(f"Błąd FFmpeg: {error_message}")
     
-    elif "video" in st.session_state and "audio" in st.session_state:
-        if st.session_state.video and st.session_state.audio:
-            output_video_path = os.path.join("/tmp", f"output_video_{uuid.uuid4()}.mp4")
+if "video" in st.session_state and "audio" in st.session_state:
+    if st.session_state.video and st.session_state.audio:
+        output_video_path = os.path.join(tempfile.gettempdir(), f"output_video_{uuid.uuid4()}.mp4")
 
-            # Upewnij się, że zawsze używane jest nowe audio
-            if not os.path.exists(st.session_state.audio) or os.path.getsize(st.session_state.audio) == 0:
-                st.error("Nie znaleziono wygenerowanego pliku audio! Upewnij się, że zapisano zmiany.")
+        #  Debugowanie: Sprawdź, czy audio istnieje
+        st.write(f"🔎 Używane audio przed scaleniem: {st.session_state.audio}")
+        
+        if not os.path.exists(st.session_state.audio) or os.path.getsize(st.session_state.audio) == 0:
+            st.error(" Nie znaleziono wygenerowanego pliku audio! Upewnij się, że zapisano zmiany.")
+        else:
+            combine_video_with_audio(st.session_state.video, st.session_state.audio, output_video_path)
+            st.success("✅ Scalanie zakończone!")
+
+            #  Debugowanie: Sprawdź, czy nowe wideo istnieje
+            if os.path.exists(output_video_path):
+                st.write(f" Nowe wideo zapisane jako: {output_video_path}")
+                st.video(output_video_path)
             else:
-                combine_video_with_audio(st.session_state.video, st.session_state.audio, output_video_path)
-                st.success("Scalanie zakończone!")
+                st.error(" Nie udało się zapisać nowego pliku wideo.")
 
 # Funkcja weryfikująca poprawność klucza API OpenAI, sprawdzając możliwość wykonania zapytania testowego.
 def verify_openai_api_key(api_key):
