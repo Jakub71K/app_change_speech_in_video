@@ -298,9 +298,11 @@ def combine_video_with_audio(video_path, audio_path, output_path):
         error_message = process.stderr if process.stderr else "Nieznany błąd FFmpeg"
         raise RuntimeError(f"Błąd FFmpeg: {error_message}")
     
-if st.session_state.video and st.session_state.audio:
-    output_video_path = os.path.join("/tmp", f"output_video_{uuid.uuid4()}.mp4")
-    combine_video_with_audio(st.session_state.video, st.session_state.audio, output_video_path)
+if "video" in st.session_state and "audio" in st.session_state:
+    if st.session_state.video and st.session_state.audio:
+        output_video_path = os.path.join("/tmp", f"output_video_{uuid.uuid4()}.mp4")
+        combine_video_with_audio(st.session_state.video, st.session_state.audio, output_video_path)
+
 
 
 
@@ -415,6 +417,15 @@ def translate_text_to_polish(text, openai_api_key):
 #
 
 def main():
+    if "video" not in st.session_state:
+        st.session_state.video = None
+
+    if "audio" not in st.session_state:
+        st.session_state.audio = None
+
+    if "transcription" not in st.session_state:
+        st.session_state.transcription = None
+
     st.title(":movie_camera: VocalCraft :movie_camera:")
     st.header("Twoje narzędzie do edycji wideo")
     st.text("VocalCraft to aplikacja do edycji wideo, która oferuje transkrypcję mowy z wideo na tekst w języku polskim i angielskim(z automatycznym tłumaczeniem). Pozwala na edycję tekstu z możliwością dostosowania treści nowego wideo. Generowanie nowych ścieżek audio na podstawie edytowanego tekstu. Dodawanie napisów do wideo oraz łączenie ścieżek audio z wideo, które można pobrać na dysk.")
@@ -423,6 +434,7 @@ def main():
     st.sidebar.markdown(f"**Suma kosztów:**")
     st.sidebar.metric(label="USD", value=f"${st.session_state.get('cost_usd', 0):.4f}")
     st.sidebar.metric(label="PLN", value=f"{st.session_state.get('cost_pln', 0):.4f} zł")
+
 
 
     if not st.session_state.get("openai_api_key"):
